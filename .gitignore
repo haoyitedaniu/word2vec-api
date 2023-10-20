@@ -2,6 +2,10 @@
 __pycache__/
 *.py[cod]
 
+models/
+
+venv/ 
+
 # C extensions
 *.so
 
