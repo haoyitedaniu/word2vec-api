@@ -20,11 +20,18 @@ import pickle
 import argparse
 import base64
 import sys
+from datetime import datetime
 
 parser = reqparse.RequestParser()
 
 
 def filter_words(words):
+    #print("here is model vocab",flush=True)
+    #print(model.vocab,flush=True)
+
+    print("words are here",flush=True)
+    print(words,flush=True)
+
     if words is None:
         return
     return [word for word in words if word in model.vocab]
@@ -32,11 +39,45 @@ def filter_words(words):
 
 class N_Similarity(Resource):
     def get(self):
+        print("this is before the parser",flush=True)
         parser = reqparse.RequestParser()
-        parser.add_argument('ws1', type=str, required=True, help="Word set 1 cannot be blank!", action='append')
-        parser.add_argument('ws2', type=str, required=True, help="Word set 2 cannot be blank!", action='append')
+        print("this is after the parser is obtained",flush=True)
+        parser.add_argument('ws1', type=str, required=True, help="Word set 1 cannot be blank!", action='append',location='args')
+        parser.add_argument('ws2', type=str, required=True, help="Word set 2 cannot be blank!", action='append',location='args')
+        #get the arguments and conver to lower case for English
         args = parser.parse_args()
-        return model.n_similarity(filter_words(args['ws1']),filter_words(args['ws2'])).item()
+        
+        print("here are the args",flush=True)
+        print(args,flush=True)
+
+        ws1=args['ws1'] #list of ws1 object
+        ws2=args['ws2'] #list of ws2 object
+        ws1lower= [x.lower() for x in ws1]
+        ws2lower= [x.lower() for x in ws2]
+
+        print("here are the final args",flush=True)
+        print(ws1,ws2,ws1lower,ws2lower,flush=True)
+
+        filter1=filter_words(ws1lower)
+        filter2=filter_words(ws2lower)
+
+        print("filter1",flush=True)
+        print(filter1,flush=True)
+        print("filter2",flush=True)
+        print(filter2,flush=True)
+
+        print("before calculating similarity",flush=True)
+        
+        if not filter1 or not filter2:
+            return 0
+
+        res=model.n_similarity(filter1,filter2).item()
+
+        #res= model.n_similarity(filter_words(args['ws1']),filter_words(args['ws2'])).item()
+        print("after calculating similarity",flush=True)
+        #return (args,filter1,filter2) 
+        return res
+        #return model.n_similarity(filter_words(args['ws1']),filter_words(args['ws2'])).item()
 
 
 class Similarity(Resource):
@@ -63,13 +104,13 @@ class MostSimilar(Resource):
         pos = [] if pos == None else pos
         neg = [] if neg == None else neg
         t = 10 if t == None else t
-        print("positive: " + str(pos) + " negative: " + str(neg) + " topn: " + str(t))
+        print("positive: " + str(pos) + " negative: " + str(neg) + " topn: " + str(t),flush=True)
         try:
             res = model.most_similar_cosmul(positive=pos,negative=neg,topn=t)
             return res
         except Exception as e:
-            print(e)
-            print(res)
+            print(e,flush=True)
+            print(res,flush=True)
 
 
 class Model(Resource):
@@ -82,7 +123,7 @@ class Model(Resource):
             res = base64.b64encode(res).decode()
             return res
         except Exception as e:
-            print(e)
+            print(e,flush=True)
             return
 
 class ModelWordSet(Resource):
@@ -91,8 +132,16 @@ class ModelWordSet(Resource):
             res = base64.b64encode(pickle.dumps(set(model.index2word))).decode()
             return res
         except Exception as e:
-            print(e)
+            print(e,flush=True)
             return
+class TestURL(Resource):
+    def get(self):
+        try:
+            res="hi you get this URL"
+            return res
+        except Exception as e:
+            print(e,flush=True)
+            return "oops you did not get this URL"
 
 app = Flask(__name__)
 api = Api(app)
@@ -125,10 +174,21 @@ if __name__ == '__main__':
     path = args.path if args.path else "/word2vec"
     port = int(args.port) if args.port else 5000
     if not args.model:
-        print("Usage: word2vec-apy.py --model path/to/the/model [--host host --port 1234]")
-
+        print("Usage: word2vec-api.py --model path/to/the/model [--host host --port 1234]")
+    
     print("Loading model...")
+    # datetime object containing current date and time
+    now = datetime.now()
+    print("now =", now)
+    # dd/mm/YY H:M:S
+    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+    print("date and time =", dt_string)
     model = word2vec.KeyedVectors.load_word2vec_format(model_path, binary=binary)
+
+    now=datetime.now()
+    dt_string2 = now.strftime("%d/%m/%Y %H:%M:%S")
+    print("model load finished");
+    print("date and time =", dt_string2)
 
     norm = args.norm if args.norm else "both"
     norm = norm.lower()
@@ -149,9 +209,13 @@ if __name__ == '__main__':
     else:
         print("Model loaded. (norm=",norm,")")
 
+    print("here is path:")
+    print(path)
+    
     api.add_resource(N_Similarity, path+'/n_similarity')
     api.add_resource(Similarity, path+'/similarity')
     api.add_resource(MostSimilar, path+'/most_similar')
     api.add_resource(Model, path+'/model')
     api.add_resource(ModelWordSet, '/word2vec/model_word_set')
+    api.add_resource(TestURL,'/word2vec/testURL')
     app.run(host=host, port=port)
